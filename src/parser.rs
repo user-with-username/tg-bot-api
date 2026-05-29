@@ -517,7 +517,10 @@ pub enum MethodArgs {
 
 impl MethodArgs {
     fn new(args: Vec<Argument>) -> Self {
-        if args.iter().any(|arg| arg.kind.maybe_file_to_send()) {
+        if args
+            .iter()
+            .any(|arg| arg.is_file_to_upload_according_to_desc() || arg.kind.maybe_file_to_send())
+        {
             Self::WithMultipart(args)
         } else if args.is_empty() {
             Self::No
@@ -533,6 +536,13 @@ pub struct Argument {
     pub kind: Type,
     pub required: bool,
     pub description: String,
+}
+
+impl Argument {
+    /// This is more reliable than checking the type
+    fn is_file_to_upload_according_to_desc(&self) -> bool {
+        self.description.contains("multipart/form-data")
+    }
 }
 
 fn make_url_from_fragment(fragment: String) -> String {

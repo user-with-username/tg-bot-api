@@ -19,33 +19,10 @@ impl Pattern {
     fn parts(self) -> Vec<SearcherPattern> {
         match self {
             Pattern::ReturnType => vec![
-                SearcherPattern::default()
-                    .by_word("Returns")
-                    .by_word("the")
-                    .by_word("bot's")
-                    .by_word("Telegram")
-                    .exclude(),
-                SearcherPattern::default()
-                    .by_word("Returns")
-                    .by_word("the")
-                    .by_word("gifts")
-                    .exclude(),
-                SearcherPattern::default()
-                    .by_word("Returns")
-                    .by_word("the")
-                    .by_word("list")
-                    .by_word("of")
-                    .exclude(),
-                SearcherPattern::default()
-                    .by_word("Returns")
-                    .by_word("the")
-                    .by_word("amount")
-                    .by_word("of")
-                    .exclude(),
                 SearcherPattern::default().by_word("On").by_word("success"),
+                SearcherPattern::default().by_word("returns").by_word("a"),
+                SearcherPattern::default().by_word("Returns").by_word("an"),
                 SearcherPattern::default().by_word("Returns"),
-                SearcherPattern::default().by_word("returns"),
-                SearcherPattern::default().by_word("An"),
             ],
             Pattern::Default => vec![
                 SearcherPattern::default().by_word("Defaults").by_word("to"),
@@ -58,6 +35,11 @@ impl Pattern {
                     .by_word("must")
                     .by_word("be")
                     .by_kind(PartKind::Italic)
+                    .with_offset(-1),
+                SearcherPattern::default()
+                    .by_word("must")
+                    .by_word("be")
+                    .by_quotes()
                     .with_offset(-1),
                 SearcherPattern::default()
                     .by_word("always")
@@ -146,6 +128,8 @@ impl PartialEq<&[Part]> for SearcherPattern {
 #[logos(skip r"[, ]")]
 #[logos(skip "\n")]
 enum SentenceLexer {
+    #[regex(r"\.[A-Z][A-Z\d]{2,}")]
+    FileExt,
     #[regex(r#"[^, "“”\(\)\.\n]+"#)]
     Word,
     #[token(".")]
@@ -430,6 +414,10 @@ pub(crate) fn parse_node(elem: NodeRef<Node>) -> Result<Vec<Sentence>, ParseErro
                     };
 
                     match token {
+                        SentenceLexer::FileExt => {
+                            let part = Part::new(lexeme.to_string());
+                            parts.push(part);
+                        }
                         SentenceLexer::Word if !paren => {
                             let part = Part::new(lexeme.to_string());
                             parts.push(part);
@@ -526,9 +514,14 @@ pub fn parse_type_custom<E, T>(
 where
     E: Fn(&SentenceRef) -> Option<T>,
 {
-    let sentences = text.sentences()?;
+    let mut sentences = text.sentences()?;
     let mut result = None;
     let patterns = pattern.parts();
+
+    // Ignore the first sentence if it's not the only one and we are looking for a return type
+    if pattern == Pattern::ReturnType && sentences.len() > 1 {
+        sentences.remove(0);
+    }
 
     'sentences: for sentence in &sentences {
         // println!("{:?}", sentence);
