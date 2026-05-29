@@ -28,7 +28,18 @@ impl Pattern {
                 SearcherPattern::default()
                     .by_word("Returns")
                     .by_word("the")
+                    .by_word("gifts")
+                    .exclude(),
+                SearcherPattern::default()
+                    .by_word("Returns")
+                    .by_word("the")
                     .by_word("list")
+                    .by_word("of")
+                    .exclude(),
+                SearcherPattern::default()
+                    .by_word("Returns")
+                    .by_word("the")
+                    .by_word("amount")
                     .by_word("of")
                     .exclude(),
                 SearcherPattern::default().by_word("On").by_word("success"),
@@ -63,6 +74,12 @@ impl Pattern {
             ],
             Pattern::OneOf => {
                 vec![
+                    SearcherPattern::default()
+                        .by_word("Can")
+                        .by_word("be")
+                        .by_word("available")
+                        .by_word("only")
+                        .exclude(),
                     SearcherPattern::default().by_word("either"),
                     SearcherPattern::default().by_word("One").by_word("of"),
                     SearcherPattern::default().by_word("one").by_word("of"),
@@ -257,19 +274,14 @@ impl PartialEq<&str> for Part {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
 enum PartKind {
+    #[default]
     Word,
     Link(String),
     Bold,
     Italic,
     Code,
-}
-
-impl Default for PartKind {
-    fn default() -> Self {
-        Self::Word
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -519,6 +531,7 @@ where
     let patterns = pattern.parts();
 
     'sentences: for sentence in &sentences {
+        // println!("{:?}", sentence);
         for pattern in &patterns {
             for (word_idx, words) in sentence.parts.windows(pattern.parts.len()).enumerate() {
                 if *pattern == words {

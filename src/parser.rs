@@ -283,15 +283,43 @@ impl Type {
             Some((min, max))
         })?;
         let one_of = sentence::parse_type_custom(Pattern::OneOf, description, |sentence| {
+            let mut parts = sentence
+                .parts()
+                .iter()
+                .filter(|part| {
+                    part.has_quotes()
+                        || part.is_italic()
+                        || part.as_inner().chars().all(|c| c.is_ascii_digit())
+                })
+                .collect::<Vec<_>>();
+
+            let (mut has_quotes, mut has_italic, mut has_digits) = (false, false, false);
+
+            for part in parts.iter() {
+                if part.has_quotes() {
+                    has_quotes = true
+                }
+                if part.is_italic() {
+                    has_italic = true
+                }
+                if part.as_inner().chars().all(|c| c.is_ascii_digit()) {
+                    has_digits = true
+                }
+            }
+
+            if has_quotes && has_digits {
+                parts.retain(|p| p.has_quotes());
+            }
+            if has_italic && has_digits {
+                parts.retain(|p| p.has_quotes());
+            }
+            if has_quotes && has_italic {
+                println!("Can't decide which marker to use for any_of for parts: {parts:?}")
+            }
+
             Some(
-                sentence
-                    .parts()
-                    .iter()
-                    .filter(|part| {
-                        part.has_quotes()
-                            || part.is_italic()
-                            || part.as_inner().chars().all(|c| c.is_ascii_digit())
-                    })
+                parts
+                    .into_iter()
                     .map(|part| part.as_inner())
                     .cloned()
                     .dedup()
