@@ -71,6 +71,7 @@ impl Pattern {
                         .by_word("be")
                         .by_quotes()
                         .with_offset(-1),
+                    SearcherPattern::default().by_word("for").by_word("example").exclude(),
                     SearcherPattern::default()
                         .by_quotes()
                         .by_word("or")
