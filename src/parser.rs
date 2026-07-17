@@ -447,7 +447,7 @@ impl Type {
             Type::Or(types) => types.iter().any(Self::maybe_file_to_send),
             Type::Array(ty) => ty.maybe_file_to_send(),
             // Kinda bad, but the alternative is hardcoding every value
-            Type::Object(object) => object.starts_with("Input") && object != "InputPollOption",
+            Type::Object(object) => object.starts_with("Input"),
         }
     }
 }
