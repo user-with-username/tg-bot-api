@@ -77,9 +77,9 @@ pub fn generate(parsed: Parsed) -> OpenAPI {
         };
 
         for content_type in [
-            Some(FORM_URL_ENCODED).filter(|_| !file_uploading),
+            (!file_uploading).then_some(FORM_URL_ENCODED),
             Some(FORM_DATA),
-            Some(JSON).filter(|_| !file_uploading),
+            (!file_uploading).then_some(JSON),
         ]
         .iter()
         .flatten()
