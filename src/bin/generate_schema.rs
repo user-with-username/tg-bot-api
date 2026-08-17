@@ -1,9 +1,32 @@
 use chrono::Datelike;
-use schemars::{gen::SchemaGenerator, schema::RootSchema, schema_for, JsonSchema};
-use serde::{Serialize, Serializer};
-use tg_bot_api::{MethodArgs, Parsed, Type};
+use schemars::{schema::RootSchema, schema_for, JsonSchema};
+use serde::Serialize;
+use std::{error::Error, fs, path::Path};
+use tg_bot_api::{MethodArgs, Parsed, Type, BOT_API_DOCS_URL};
 
-pub fn generate(parsed: Parsed) -> (Schema, RootSchema) {
+const OUT_DIR: &str = "schema";
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let api = reqwest::blocking::get(BOT_API_DOCS_URL)?.text()?;
+    let parsed = tg_bot_api::get(&api)?;
+
+    let (schema, json_schema) = generate(parsed);
+
+    let out_dir = Path::new(OUT_DIR);
+    fs::create_dir_all(out_dir)?;
+    fs::write(
+        out_dir.join("custom.json"),
+        serde_json::to_string_pretty(&schema)?,
+    )?;
+    fs::write(
+        out_dir.join("custom.schema.json"),
+        serde_json::to_string_pretty(&json_schema)?,
+    )?;
+
+    Ok(())
+}
+
+fn generate(parsed: Parsed) -> (Schema, RootSchema) {
     let methods = parsed.methods.into_iter().map(Method::from).collect();
     let objects = parsed.objects.into_iter().map(Object::from).collect();
 
@@ -27,7 +50,7 @@ pub fn generate(parsed: Parsed) -> (Schema, RootSchema) {
 }
 
 #[derive(Serialize, JsonSchema)]
-pub struct Schema {
+struct Schema {
     version: Version,
     recent_changes: Date,
     methods: Vec<Method>,
@@ -59,8 +82,6 @@ enum Kind {
         min: Option<i64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         max: Option<i64>,
-        #[schemars(with = "Option<Vec<i64>>")]
-        #[serde(skip_serializing_if = "Vec::is_empty")]
         enumeration: Vec<i64>,
     },
     String {
@@ -70,8 +91,6 @@ enum Kind {
         min_len: Option<u64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         max_len: Option<u64>,
-        #[schemars(with = "Option<Vec<String>>")]
-        #[serde(skip_serializing_if = "Vec::is_empty")]
         enumeration: Vec<String>,
     },
     Bool {
@@ -80,8 +99,6 @@ enum Kind {
     },
     Float,
     AnyOf {
-        #[schemars(with = "Option<Vec<Argument>>")]
-        #[serde(skip_serializing_if = "Vec::is_empty")]
         any_of: Vec<KindWrapper>,
     },
     Reference {
@@ -141,17 +158,15 @@ impl From<tg_bot_api::Type> for KindWrapper {
 struct Method {
     name: String,
     description: String,
-    #[schemars(with = "Option<Vec<Argument>>")]
-    #[serde(skip_serializing_if = "Vec::is_empty")]
     arguments: Vec<Argument>,
-    multipart_only: bool,
+    maybe_multipart: bool,
     return_type: KindWrapper,
     documentation_link: String,
 }
 
 impl From<tg_bot_api::Method> for Method {
     fn from(method: tg_bot_api::Method) -> Self {
-        let (multipart_only, args) = match method.args {
+        let (maybe_multipart, args) = match method.args {
             MethodArgs::No => (false, vec![]),
             MethodArgs::Yes(args) => (false, args),
             MethodArgs::WithMultipart(args) => (true, args),
@@ -160,7 +175,7 @@ impl From<tg_bot_api::Method> for Method {
             name: method.name,
             description: method.description,
             arguments: args.into_iter().map(Argument::from).collect(),
-            multipart_only,
+            maybe_multipart,
             return_type: KindWrapper::from(method.return_type),
             documentation_link: method.docs_link,
         }
@@ -172,7 +187,7 @@ struct Argument {
     name: String,
     description: String,
     required: bool,
-    #[serde(flatten)]
+    #[serde(rename = "type_info")]
     kind: KindWrapper,
 }
 
@@ -207,6 +222,9 @@ impl From<tg_bot_api::Object> for Object {
     }
 }
 
+#[derive(Serialize, JsonSchema)]
+#[serde(tag = "type")]
+#[serde(rename_all = "snake_case")]
 enum ObjectData {
     Properties { properties: Vec<Property> },
     AnyOf { any_of: Vec<KindWrapper> },
@@ -227,61 +245,12 @@ impl From<tg_bot_api::ObjectData> for ObjectData {
     }
 }
 
-impl Serialize for ObjectData {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        #[derive(Serialize)]
-        #[serde(rename_all = "snake_case")]
-        #[serde(tag = "type")]
-        enum Inner<'a> {
-            Properties { properties: &'a Vec<Property> },
-            AnyOf { any_of: &'a Vec<KindWrapper> },
-        }
-
-        match self {
-            ObjectData::Properties { properties } => Inner::Properties { properties },
-            ObjectData::AnyOf { any_of } => Inner::AnyOf { any_of },
-            ObjectData::Unknown => return ().serialize(serializer),
-        }
-        .serialize(serializer)
-    }
-}
-
-impl JsonSchema for ObjectData {
-    fn schema_name() -> String {
-        "ObjectData".to_string()
-    }
-
-    fn json_schema(gen: &mut SchemaGenerator) -> schemars::schema::Schema {
-        #[allow(dead_code)]
-        #[derive(Serialize, JsonSchema)]
-        #[serde(untagged)]
-        enum Inner<'a> {
-            Properties {
-                #[serde(rename = "type")]
-                kind: String,
-                properties: &'a Vec<Property>,
-            },
-            AnyOf {
-                #[serde(rename = "type")]
-                kind: String,
-                any_of: &'a Vec<KindWrapper>,
-            },
-            Unknown {},
-        }
-
-        Inner::json_schema(gen)
-    }
-}
-
 #[derive(Serialize, JsonSchema)]
 struct Property {
     name: String,
     description: String,
     required: bool,
-    #[serde(flatten)]
+    #[serde(rename = "type_info")]
     kind: KindWrapper,
 }
 

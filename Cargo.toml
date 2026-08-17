@@ -12,8 +12,12 @@ include = ["Cargo.toml", "LICENSE-*.md", "src/**/*"]
 keywords = ["telegram", "telegram-bot-api", "api", "parser"]
 categories = ["development-tools", "parsing"]
 
-[workspace]
-members = ["gh-pages-generator"]
+[[bin]]
+name = "generate_schema"
+required-features = ["schema-gen"]
+
+[features]
+schema-gen = ["dep:reqwest", "dep:serde", "dep:serde_json", "dep:schemars"]
 
 [dependencies]
 scraper = "0.18.1"
@@ -27,3 +31,8 @@ percent-encoding = "2.1.0"
 logos = "0.14.0"
 log = "0.4.14"
 tendril = "0.4.2"
+
+reqwest = { version = "0.10.8", features = ["blocking"], optional = true }
+serde = { version = "1.0.117", features = ["derive"], optional = true }
+serde_json = { version = "1.0.59", optional = true }
+schemars = { version = "0.8.0", optional = true }
