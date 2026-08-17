@@ -16,16 +16,9 @@ jobs:
         with:
           ref: 'master'
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
+        run: rustup default stable
       - name: Generate schema
-        uses: actions-rs/cargo@v1
-        with:
-          command: run
-          args: --bin generate_schema --features schema-gen
+        run: cargo run --bin generate_schema --features schema-gen
       - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"

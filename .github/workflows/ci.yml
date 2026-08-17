@@ -9,14 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: generate-lockfile
+      - name: Install toolchain
+        run: rustup default stable
+      - run: cargo generate-lockfile
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -38,36 +33,23 @@ jobs:
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-build-target-
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build 
-          args: --all --all-features --all-targets
-      - uses: actions-rs/cargo@v1
-        with: 
-          command: test
-          args: --all --all-features
+      - run: cargo build --all --all-features --all-targets
+      - run: cargo test --all --all-features
   rustfmt:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          override: true
-          components: rustfmt
-      - name: cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+        run: |
+          rustup default nightly
+          rustup component add rustfmt
+      - run: cargo fmt --all -- --check
   clippy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: rustup component add clippy
-      - uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all --all-targets --all-features -- -D warnings
+      - name: Install toolchain
+        run: |
+          rustup default stable
+          rustup component add clippy
+      - run: cargo clippy --all --all-targets --all-features -- -D warnings
